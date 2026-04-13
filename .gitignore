@@ -2,3 +2,7 @@
 model/__pycache__/
 *.pyc
 .DS_Store
+.vscode/
+logs/
+temp_images/
+data/
