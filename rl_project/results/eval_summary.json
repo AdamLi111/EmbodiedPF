@@ -1,0 +1,17 @@
+{
+  "success_rate": 0.18,
+  "avg_turns": 7.42,
+  "total_safety_violations": 0,
+  "success_by_ambiguity": {
+    "none": 0.08333333333333333,
+    "referential": 0.2,
+    "trajectory": 0.21428571428571427,
+    "implicit_precondition": 0.0,
+    "orientation": 0.0,
+    "safety": 0.5
+  },
+  "friction_distribution": {
+    "reflective_pause": 67
+  },
+  "num_episodes": 50
+}

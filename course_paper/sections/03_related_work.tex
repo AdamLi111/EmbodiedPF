@@ -1,0 +1,17 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Vision-Language-Action Models.}
+Recent vision-language-action models such as RT-2 \cite{zitkovich2023rt2}, OpenVLA \cite{kim2025openvla}, and $\pi_0$ \cite{black2024pi0} learn direct mappings from vision and language to motor control. Planner-style systems such as SayCan \cite{ahn2022saycan}, Inner Monologue \cite{huang2023inner}, LLM-Planner \cite{song2023llmplanner}, and Code-as-Policies \cite{liang2023codeaspolicies} keep the LLM at a high level and delegate low-level control to primitives. All of these systems optimize for task completion; none learn \emph{when} to slow down in order to disambiguate. Our work is orthogonal: it operates above such controllers and treats the decision of whether to execute or clarify as its own learning target.
+
+\paragraph{Ambiguity and Clarification in Dialogue.}
+Ambiguity is pervasive in natural language \cite{poesio2005anaphoric,piantadosi2012communicative}. Benchmarks such as AmbigQA \cite{min2020ambigqa}, AmbiQT \cite{bhaskar2023ambiqt}, and CLAMBER \cite{zhang2024clamber} study when and how systems should ask clarifying questions. \citet{deng2023prompting} and \citet{zhang2024modeling} note that LLMs can generate clarification questions but struggle to identify \emph{when} clarification is truly needed. Our work tackles this when-to-clarify problem in an embodied setting via RL rather than supervised learning, and therefore complements rather than replaces these datasets.
+
+\paragraph{Positive Friction.}
+Positive friction \cite{inan2025betterslow,obiso2025dynamic} is the immediate precursor to our setting. \citet{ponder2026} introduce \textsc{Ponder}, the first implementation of positive friction on a physical robot (Misty II), and the environment we build on. The Frictional Agent Alignment Framework (FAAF) \cite{nath2025faaf} trains a two-player frictive-state and intervention policy via a closed-form supervised loss derived from preference data; their setting is text-only collaborative dialogue and their controller is a single fine-tuned Llama-3-8B. Our setting is embodied, action-irreversible, and explicitly separates the high-level friction decision (learned by PPO) from low-level language generation (delegated to frozen LLMs).
+
+\paragraph{Why RL?}
+Three classes of alternative exist. \emph{Prompt engineering} (as in \textsc{Ponder}) is cheap but cannot optimize directly against safety violations or user satisfaction. \emph{Supervised imitation} \cite{ross2011dagger} would require labelled friction-or-execute decisions, which are costly to collect at scale and depend on assumptions we may not share. \emph{Preference-based offline methods} (DPO \cite{rafailov2023dpo} or FAAF's regression loss \cite{nath2025faaf}) avoid a reward model but cannot improve beyond the support of the preference dataset. RL via PPO lets us optimize a composite reward containing hard safety signals, explore friction types the prompt author did not anticipate, and in principle adapt online to new scenes.
+
+\paragraph{Safe Human-Robot Interaction.}
+Safety-aware planning under uncertainty \cite{lasota2017safe,hu2024shielding} and active preference learning \cite{sadigh2017active,biyik2024active} address similar concerns at the control layer. In contrast, we treat safety as an auxiliary reward at the \emph{dialogue} layer, preventing unsafe physical actions by asking questions before they are committed.

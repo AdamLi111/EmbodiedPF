@@ -1,0 +1,132 @@
+\section{Project Description}
+\label{sec:methods}
+
+We formalize the task as an MDP, describe the two policy architectures under comparison, and give the PPO training procedure.
+
+\subsection{MDP Formulation}
+
+\paragraph{State space $\mathcal{S}$.}
+At turn $t$ the observation $s_t \in \mathbb{R}^{1162}$ is the concatenation of three 384-dimensional sentence embeddings produced by a frozen MiniLM encoder \cite{reimers2019sbert} and a 10-dimensional scalar-feature block:
+\begin{equation}
+    s_t = [\mathbf{e}_{\text{cmd}}\,;\,\mathbf{e}_{\text{vision}}\,;\,\mathbf{e}_{\text{scene}}\,;\,\mathbf{m}_t],
+\end{equation}
+where $\mathbf{e}_{\text{cmd}}$ encodes the latest user utterance, $\mathbf{e}_{\text{vision}}$ encodes the robot's current field-of-view description, $\mathbf{e}_{\text{scene}}$ encodes the full omniscient scene description (positions, hazards, action history), and $\mathbf{m}_t$ contains: (i) turn fraction $t/T_{\max} \in [0,1]$, (ii) number of visible objects, (iii) number of hazards, and (iv) a 7-dim one-hot for the ambiguity category (referential, trajectory, implicit-precondition, contextual-safety, multi-category, none, other).
+
+\paragraph{Action space $\mathcal{A}$.}
+The action space is $\mathcal{A} = \{0, 1, 2, 3, 4, 5\}$:
+\[
+\begin{array}{l|l}
+\textbf{Action} & \textbf{Meaning} \\ \hline
+0\ \texttt{execute} & commit to a physical action \\
+1\ \texttt{probe} & clarifying question \\
+2\ \texttt{assumption\_reveal} & state current assumption \\
+3\ \texttt{overspecify} & add confirmatory detail \\
+4\ \texttt{reflective\_pause} & verbal pause \\
+5\ \texttt{reinforce} & restate key information \\
+\end{array}
+\]
+Crucially, the RL agent \emph{never} outputs distances or angles; it only chooses one of six high-level intents.
+
+\paragraph{Transitions $P$.}
+When $a_t = 0$, GPT-5-nano is prompted to emit a structured JSON action (e.g., \texttt{\{navigate, distance, turn\_degrees, target\}}) which the \textsc{Ponder} world model executes, updating $(x, y, \theta)$, checking visibility and collisions, and marking the task done or failed. When $a_t \in \{1,\dots,5\}$ one of five dedicated prompt handlers (one per friction type) generates a natural-language utterance conditioned on command, vision context, and history. A simulated user (GPT-4o-mini) responds with either a disambiguation or a follow-up. The new utterance, scene description, and metadata are re-encoded to produce $s_{t+1}$.
+
+\paragraph{Reward $R$.}
+We shape reward as a weighted sum of outcome and progress signals:
+\begin{equation}
+\label{eq:reward}
+\begin{split}
+R_t = &\;\; (+1.0) \cdot \mathbf{1}[\text{success}]  \\
+      &+(-1.0) \cdot \mathbf{1}[\text{failure}] \\
+      &+(-5.0) \cdot \mathbf{1}[\text{safety\_violation}] \\
+      &+(+0.2) \cdot \mathbf{1}[\text{disambiguation}] \\
+      &+(+0.1) \cdot \mathbf{1}[\text{friction\_prevented\_unsafe}] \\
+      &+(-0.15) \cdot \mathbf{1}[\text{turn\_elapsed}].
+\end{split}
+\end{equation}
+The per-turn penalty ($-0.15$) is the hinge of the trade-off: it penalizes gratuitous friction but is modest enough that clarification pays off when it prevents a $-1.0$ failure or $-5.0$ safety violation. Episodes terminate on success, failure, safety violation, or at $T_{\max} = 10$ turns.
+
+\subsection{Policy Architectures}
+
+\paragraph{Flat policy.}
+A single MLP $\pi_\theta^{\text{flat}} : \mathbb{R}^{1162} \to \Delta^{5}$ maps the observation to a categorical distribution over all six actions:
+\[
+1162 \to 128 \to 64 \to 6 \xrightarrow{\text{softmax}} \pi(a \mid s).
+\]
+
+\paragraph{Hierarchical policy.}
+Two MLPs decouple the \emph{whether} from the \emph{which}. A gate network $\pi^{\text{gate}} : \mathbb{R}^{1162} \to \Delta^1$ decides execute-vs-friction, and a selector $\pi^{\text{sel}} : \mathbb{R}^{1162} \to \Delta^4$ chooses among the five friction types when the gate fires:
+\begin{equation}
+\pi_\theta^{\text{hier}}(a \mid s) =
+\begin{cases}
+\pi^{\text{gate}}(0 \mid s), & a = 0, \\
+\pi^{\text{gate}}(1 \mid s)\,\pi^{\text{sel}}(a-1 \mid s), & a \in \{1,\dots,5\}.
+\end{cases}
+\end{equation}
+Log-probabilities compose additively, which allows a standard PPO update.
+
+\paragraph{Value network.}
+Both policies share the same value-network design: an MLP $V_\phi : \mathbb{R}^{1162} \to \mathbb{R}$ with hidden sizes $128 \to 64$. Policy and value networks are trained jointly with a single Adam optimizer.
+
+\subsection{Pipeline Overview}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{figures/pipeline.pdf}
+    \caption{End-to-end pipeline. The frozen MiniLM encoder produces three 384-dim embeddings which, with 10 scalar features, form the 1162-dim observation. The learned policy outputs a categorical over $\{0,\dots,5\}$. Action $0$ dispatches to GPT-5-nano for physical action generation; actions $1$--$5$ dispatch to dedicated friction-prompt handlers. A GPT-4o-mini simulated user responds, the world model updates, and the loop repeats. Only the policy and value networks are trained.}
+    \label{fig:pipeline}
+\end{figure}
+
+\subsection{PPO Training Algorithm}
+
+\begin{algorithm}[t]
+\caption{PPO training of the friction policy}
+\label{alg:ppo}
+\begin{algorithmic}[1]
+\STATE Initialize policy $\pi_\theta$ (flat or hierarchical), value $V_\phi$
+\FOR{iteration $= 1, 2, \dots$}
+    \STATE \emph{// Collect rollout}
+    \FOR{$t = 1$ to $T_{\text{rollout}}$}
+        \STATE $a_t,\log\pi_\theta(a_t\mid s_t),V_\phi(s_t) \leftarrow \textsc{SelectAction}(s_t)$
+        \STATE $s_{t+1}, r_t, \text{done} \leftarrow \textsc{EnvStep}(a_t)$
+        \STATE Store $(s_t, a_t, r_t, \text{done}, \log\pi_\theta, V_\phi)$ in buffer
+    \ENDFOR
+    \STATE \emph{// Compute advantages via GAE}
+    \FOR{$t = T$ \textbf{down to} $1$}
+        \STATE $\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)$
+        \STATE $\hat{A}_t = \delta_t + (\gamma\lambda)\hat{A}_{t+1}$
+    \ENDFOR
+    \STATE $R_t = \hat{A}_t + V_\phi(s_t)$
+    \STATE \emph{// PPO update ($K$ epochs over minibatches)}
+    \FOR{epoch $= 1$ to $K$}
+        \FOR{minibatch $B$}
+            \STATE $r(\theta) = \pi_\theta(a\mid s)/\pi_{\theta_{\text{old}}}(a \mid s)$
+            \STATE $L^{\text{CLIP}} = \min(r\hat{A},\,\text{clip}(r,1{-}\epsilon,1{+}\epsilon)\hat{A})$
+            \STATE $L^{V} = (V_\phi(s) - R)^2$
+            \STATE $L = -L^{\text{CLIP}} + c_1 L^V - c_2 \mathcal{H}[\pi_\theta]$
+            \STATE $\theta,\phi \leftarrow \textsc{AdamStep}(\nabla L)$
+        \ENDFOR
+    \ENDFOR
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\caption{Hierarchical action selection}
+\label{alg:hier}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} observation $s$
+\STATE $g \sim \pi^{\text{gate}}(\cdot \mid s)$ \quad // Categorical over \{execute, friction\}
+\IF{$g = 0$}
+    \STATE \textbf{return} $0, \log\pi^{\text{gate}}(0 \mid s)$
+\ELSE
+    \STATE $k \sim \pi^{\text{sel}}(\cdot \mid s)$ \quad // Categorical over 5 friction types
+    \STATE \textbf{return} $k+1,\; \log\pi^{\text{gate}}(1\mid s) + \log\pi^{\text{sel}}(k\mid s)$
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Implementation Details}
+
+Our environment is a Gymnasium \cite{towers2023gymnasium} wrapper around the \textsc{Ponder} world model with rule-based and real-API dialogue backends. Rule-based mode uses a deterministic placeholder user and placeholder execution to enable rapid iteration ($\sim$2000 steps per update in CPU-seconds); real-API mode wires in GPT-5-nano for robot outputs and GPT-4o-mini for the simulated user. The MiniLM encoder \cite{reimers2019sbert} is frozen; we never back-propagate into it.
+
+Hyperparameters (all shared across both policy architectures): $\gamma = 0.99$, $\lambda = 0.95$, clip $\epsilon = 0.2$, value coefficient $c_1 = 0.5$, entropy coefficient $c_2 = 0.01$, $K = 4$ PPO epochs, minibatch size 64, learning rate $3\times 10^{-4}$, and rollout size $T_{\text{rollout}} = 2048$ for rule-based mode or $50$ for real-API mode (where each step costs an LLM call).

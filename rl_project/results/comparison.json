@@ -1,0 +1,54 @@
+{
+  "hierarchical": {
+    "success_rate": 0.404,
+    "avg_turns": 8.66,
+    "total_safety_violations": 0,
+    "success_by_ambiguity": {
+      "none": 0.11278195488721804,
+      "referential": 0.512,
+      "trajectory": 0.22727272727272727,
+      "implicit_precondition": 0.75,
+      "orientation": 0.7878787878787878,
+      "safety": 1.0
+    },
+    "friction_distribution": {
+      "probe": 2962,
+      "reinforcement": 575
+    },
+    "num_episodes": 500
+  },
+  "flat": {
+    "success_rate": 0.464,
+    "avg_turns": 8.594,
+    "total_safety_violations": 0,
+    "success_by_ambiguity": {
+      "none": 0.15441176470588236,
+      "safety": 1.0,
+      "referential": 0.56,
+      "trajectory": 0.2992125984251969,
+      "implicit_precondition": 0.8367346938775511,
+      "orientation": 0.7692307692307693
+    },
+    "friction_distribution": {
+      "reflective_pause": 2964,
+      "reinforcement": 840,
+      "assumption_reveal": 30
+    },
+    "num_episodes": 500
+  },
+  "random": {
+    "success_rate": 0.416,
+    "avg_turns": 6.256,
+    "total_safety_violations": 116,
+    "success_by_ambiguity": {
+      "referential": 0.5948275862068966,
+      "none": 0.19548872180451127,
+      "trajectory": 0.0,
+      "implicit_precondition": 0.8,
+      "orientation": 0.7407407407407407,
+      "safety": 1.0
+    },
+    "friction_distribution": {},
+    "num_episodes": 500
+  }
+}

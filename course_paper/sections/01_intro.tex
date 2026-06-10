@@ -1,0 +1,25 @@
+\section{Introduction}
+\label{sec:intro}
+
+Large Language Models (LLMs) have made it natural to instruct robots with everyday speech \cite{ahn2022saycan,huang2023inner}, but real human commands are often underspecified. An utterance such as ``bring me the cup'' can be consistent with many referents; ``move forward a bit'' admits many distances and trajectories. When an embodied agent guesses and acts immediately, wrong interpretations translate directly into physical motion --- leading to task failure, collisions, or safety violations.
+
+Dialogue theory offers a well-studied remedy: \emph{common ground}. Successful communicators make assumptions explicit and confirm mutual understanding before committing to consequential action \cite{clark1996using}. Recent work formalizes this as \emph{positive friction} \cite{inan2025betterslow,ponder2026} --- deliberate conversational moves (probing, assumption-reveal, reflective pause, reinforcement, overspecification) that slow interaction in order to prevent downstream failures. The \textsc{Ponder} system \cite{ponder2026} showed that applying positive friction in an embodied robot improves user-study task success from $18.8\%$ to $89.6\%$ and synthetic success from $60.3\%$ to $74.8\%$, at a cost of roughly one additional dialogue turn.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{figures/motivation.pdf}
+    \caption{Motivation. Without positive friction, the robot executes ambiguous commands immediately and fails. With the right type of friction (probing, assumption-reveal, reflective pause, reinforcement, overspecification), the robot disambiguates before committing to a physical action. Our goal is to \emph{learn} the policy that chooses whether and which friction to apply.}
+    \label{fig:motivation}
+\end{figure}
+
+However, \textsc{Ponder}'s controller is \emph{hand-designed}: a carefully engineered vision-language-model (VLM) prompt chooses whether to clarify and which friction to apply. Prompt-based controllers are rigid; they do not adapt to user-specific preferences, new scenes, or new ambiguity distributions, and they cannot directly optimize measurable outcomes such as task success and safety.
+
+\noindent\textbf{This project.} We ask: \emph{can a reinforcement-learning agent learn when and which type of friction to apply?} We replace \textsc{Ponder}'s hand-designed controller with a learned policy trained via Proximal Policy Optimization (PPO) \cite{schulman2017ppo} on an LLM-in-the-loop environment. The RL agent does not generate language itself; it only chooses one of six high-level actions --- \texttt{execute} or one of five friction types --- and delegates actual utterance generation and physical motion to frozen LLMs and the \textsc{Ponder} world model.
+
+\noindent\textbf{Contributions.}
+\begin{enumerate}
+    \item We formalize communicative friction as a Markov Decision Process (Section~\ref{sec:methods}) with a 1162-dim observation, a 6-way action space, and a reward that combines success, safety, disambiguation, and a per-turn penalty.
+    \item We implement a Gymnasium-compatible environment in which the robot's natural-language behavior is produced by frozen LLMs and the physical world is simulated by \textsc{Ponder}'s 2D coordinate world model.
+    \item We compare a \emph{flat} 6-way policy against a \emph{hierarchical} gate-then-selector policy, and evaluate both against always-execute and random baselines.
+    \item On 50-episode evaluations, the flat policy attains $46.4\%$ task success with $0$ safety violations, exceeding the random baseline, which attains $41.6\%$ but incurs $116$ safety violations. Results suggest that learned friction policies can exploit safety signals that prompt-based controllers do not.
+\end{enumerate}

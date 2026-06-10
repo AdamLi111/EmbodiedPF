@@ -1,0 +1,61 @@
+%File: main.tex
+\documentclass[letterpaper]{article}
+\usepackage{aaai2026}
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage[hyphens]{url}
+\usepackage{graphicx}
+\urlstyle{rm}
+\def\UrlFont{\rm}
+\usepackage{natbib}
+\usepackage{caption}
+\frenchspacing
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+\pdfinfo{
+/TemplateVersion (2026.1)
+}
+
+\setcounter{secnumdepth}{2}
+
+\title{Learning When to Pause: Reinforcement Learning of Positive Friction Policies for Embodied Dialogue}
+
+\author{
+    Haocheng Li \\
+}
+\affiliations{
+    Northeastern University \\
+    li.haoche@northeastern.edu
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\input{sections/00_abstract}
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_background}
+\input{sections/03_related_work}
+\input{sections/04_methods}
+\input{sections/05_experiments}
+\input{sections/06_conclusion}
+
+\bibliographystyle{aaai2026}
+\bibliography{references}
+
+\end{document}

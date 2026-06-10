@@ -1,0 +1,12 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We replaced the hand-designed positive-friction controller in \textsc{Ponder} with a reinforcement-learning agent that chooses, at every dialogue turn, whether to execute or which of five friction types to apply. Formalizing the task as an MDP with a 1162-dim observation, a 6-way action space, and a reward that couples task success with a strong safety penalty, we trained both a flat and a hierarchical PPO policy in an LLM-in-the-loop Gymnasium environment. On 50-episode rule-based evaluations, the flat policy reaches $46.4\%$ success with \emph{zero} safety violations, outperforming always-execute ($38.8\%$, $152$ violations) and random ($41.6\%$, $116$ violations). The hierarchical factoring was not helpful at this scale; the flat softmax is a simpler and stronger baseline.
+
+Three take-aways. First, the per-turn penalty is the central lever --- too lenient and the policy over-clarifies; too harsh and it degenerates to always-execute. Second, the learned policies exploit the safety reward in ways the baselines cannot, which is the clearest evidence that learning pays off in this setting. Third, our real-API pilots confirm the full pipeline works end-to-end but show that the small budgets affordable under per-step LLM cost are insufficient for a well-differentiated friction policy; a rule-based-then-real-API curriculum is our most promising direction forward.
+
+\paragraph{What we learned.}
+Engineering-wise, the hardest bugs were not in PPO itself but in the environment: a premature-termination bug in the rule-based user agent made random baselines look falsely competitive, and a regex in \textsc{Ponder}'s action parser silently dropped negative and decimal degrees. Both were caught only after careful ablation and debugging of the reward curves. We also learned that frozen LLMs inside an RL loop create nontrivial throughput constraints: a 500-step real-API run takes $\sim$20 minutes, while 500k rule-based steps finishes overnight.
+
+\paragraph{Limitations and future work.}
+Our evaluation is in simulation. We plan (i) to scale real-API training to 10k+ steps with explicit entropy scheduling to avoid collapse onto a single friction type; (ii) to compare PPO against DPO trained on human preference pairs, as in FAAF \cite{nath2025faaf}; and (iii) to deploy the learned policy on the physical Misty II to see whether safety gains transfer to embodied execution. These items are left for subsequent work.

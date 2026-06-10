@@ -1,0 +1,7 @@
+gymnasium
+torch
+pyyaml
+sentence-transformers
+tensorboard
+pandas
+matplotlib

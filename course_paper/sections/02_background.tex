@@ -1,0 +1,41 @@
+\section{Background}
+\label{sec:background}
+
+\subsection{Markov Decision Processes}
+A Markov Decision Process (MDP) is a tuple $\mathcal{M} = (\mathcal{S}, \mathcal{A}, P, R, \gamma)$ where $\mathcal{S}$ is a state space, $\mathcal{A}$ an action space, $P(s' \mid s, a)$ a transition kernel, $R(s,a)$ a reward function, and $\gamma \in [0,1)$ a discount factor \cite{sutton2018rlbook}. A policy $\pi(a \mid s)$ maps states to action distributions; the objective is to maximize the expected discounted return $J(\pi) = \mathbb{E}_{\pi}\!\left[\sum_{t=0}^\infty \gamma^t R(s_t,a_t)\right]$. Our setting is technically a partially-observable MDP (POMDP) since the agent observes text embeddings rather than the true latent intent of the user; following common practice in deep RL, we treat the observation as the state.
+
+\subsection{Policy-Gradient Methods and PPO}
+Policy-gradient methods \cite{sutton1999policygrad} parameterize $\pi_\theta$ and update $\theta$ by estimating $\nabla_\theta J(\pi_\theta)$. Vanilla policy gradient has high variance and is sensitive to step size. Proximal Policy Optimization (PPO) \cite{schulman2017ppo} stabilizes updates by constraining the \emph{probability ratio}
+\begin{equation}
+    r_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)},
+\end{equation}
+and optimizing the clipped surrogate objective
+\begin{equation}
+\label{eq:ppo-clip}
+    L^{\text{CLIP}}(\theta) = \mathbb{E}_t\!\left[\min\!\left(r_t(\theta)\hat{A}_t,\; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right)\right].
+\end{equation}
+Clipping discourages updates that change action probabilities by more than $\pm\epsilon$ (we use $\epsilon = 0.2$), preventing destructive large-step updates. The full loss combines the clipped policy term with a value-function regression and an entropy bonus:
+\begin{equation}
+    L(\theta,\phi) = -L^{\text{CLIP}} + c_1 (V_\phi(s) - R_t)^2 - c_2 \mathcal{H}[\pi_\theta(\cdot \mid s)].
+\end{equation}
+
+\subsection{Generalized Advantage Estimation}
+Advantages $\hat{A}_t$ are estimated with Generalized Advantage Estimation (GAE) \cite{schulman2016gae}:
+\begin{equation}
+    \hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \delta_{t+l}, \quad \delta_t = R_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t),
+\end{equation}
+where $\lambda \in [0,1]$ trades bias for variance. GAE provides lower-variance advantage estimates than raw Monte-Carlo returns while remaining unbiased as $\lambda \to 1$.
+
+\subsection{Positive Friction in Embodied Dialogue}
+Positive friction \cite{inan2025betterslow} is a dialogue-theoretic concept: small, deliberate conversational moves that add cost in order to expose assumptions and avoid costly failures downstream. \citet{ponder2026} operationalize five friction types for an embodied robot:
+\begin{itemize}
+    \item \textbf{Probing:} a targeted clarifying question (``Which cup do you mean?'').
+    \item \textbf{Assumption-reveal:} stating the robot's current assumption (``I'm assuming you mean the red cup.'').
+    \item \textbf{Overspecification:} adding extra confirmatory detail (``I'll grab the red cup on the left table, not the blue one.'').
+    \item \textbf{Reflective pause:} a verbal pause signalling uncertainty (``Hmm, let me think about this.'').
+    \item \textbf{Reinforcement:} restating key information for confirmation (``Just to confirm, you want the red cup.'').
+\end{itemize}
+\textsc{Ponder} achieves these moves by prompting a VLM (GPT-5-nano) to choose an action type and generate an utterance. The present work treats that choice as the decision variable of an RL agent.
+
+\subsection{The \textsc{Ponder} World Model}
+\textsc{Ponder} ships a 2D coordinate-based world model that tracks robot pose $(x, y, \theta)$, objects with visibility based on a $120^\circ$ field of view, hazard zones (edges, obstacles) with collision detection, and an action history. Navigation primitives (\texttt{forward}, \texttt{backward}, \texttt{turn\_left}, \texttt{turn\_right}, \texttt{navigate(t,d,a)}), perception (\texttt{find\_object}, \texttt{describe\_vision}), and communication (\texttt{speak}, \texttt{clarify}) are dispatched by an \texttt{ActionExecutor} that parses JSON emitted by the VLM. We reuse this world model unchanged; our RL agent only reorders \emph{when} the VLM is asked to execute versus clarify.

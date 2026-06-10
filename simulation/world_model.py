@@ -243,9 +243,9 @@ class WorldModel:
         
         # Format 1: spatial_navigate - "Misty navigated to X (adjusted Y°, moved Zm)"
         if 'navigated to' in action_lower:
-            adjusted_match = re.search(r'adjusted (\d+)°', action_description)
+            adjusted_match = re.search(r'adjusted (-?\d+\.?\d*)°', action_description)
             if adjusted_match:
-                degrees = int(adjusted_match.group(1))
+                degrees = float(adjusted_match.group(1))
                 if degrees != 0:
                     self.robot_orientation = (self.robot_orientation + degrees) % 360
             
